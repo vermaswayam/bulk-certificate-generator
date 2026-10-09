@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bulk Certificate Generator</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1f2a44; --muted: #667085; --border: #e4e7ec;
+    --accent: #1f2a44; --on-accent: #fff; --gold: #b8892b; --chip: #f2f4f7;
+    --ok: #12805c; --warn: #b54708; --err: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1420; --card: #171d2b; --text: #e6e9ef; --muted: #98a2b3; --border: #2a3245;
+      --accent: #d4a84b; --on-accent: #171d2b; --gold: #d4a84b; --chip: #222a3b;
+      --ok: #3ccb8f; --warn: #f5a524; --err: #f97066;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  header a { color: var(--muted); font-size: 14px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+  textarea { min-height: 140px; font: 13px/1.5 ui-monospace, Consolas, monospace; }
+  button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; }
+  a.button { display: inline-block; text-decoration: none; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); color: var(--text); }
+  button.secondary { background: transparent; color: var(--text); border-color: var(--border); }
+  button:disabled { opacity: .5; cursor: default; }
+  .tabs { display: flex; gap: 4px; margin: 16px 0 8px; flex-wrap: wrap; }
+  .tabs button { background: transparent; color: var(--muted); border-color: transparent; padding: 4px 10px; }
+  .tabs button.active { background: var(--chip); color: var(--text); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .error { color: var(--err); white-space: pre-wrap; font-size: 14px; margin-top: 8px; }
+  .bar { height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+  .bar > div { height: 100%; width: 0; background: var(--gold); transition: width .3s; }
+  .stats { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--chip); }
+  .pill.generated, .pill.completed { color: var(--ok); }
+  .pill.failed { color: var(--err); }
+  .pill.invalid, .pill.completed_with_errors { color: var(--warn); }
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  td.detail { color: var(--muted); }
+  td.nowrap { white-space: nowrap; }
+  a { color: var(--gold); }
+  ul.jobs { list-style: none; padding: 0; margin: 0; }
+  ul.jobs li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+  ul.jobs li:hover { color: var(--gold); }
+  code { font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Bulk Certificate Generator</h1>
+    <a href="/docs">API docs &rarr;</a>
+  </header>
+
+  <form class="card" id="job-form">
+    <h2>New generation job</h2>
+    <div class="grid">
+      <div><label for="course">Course / event</label><input id="course" required maxlength="200" value="Backend Development with FastAPI"></div>
+      <div><label for="issuer">Issued by</label><input id="issuer" required maxlength="200" value="Acme Academy"></div>
+      <div><label for="date">Issue date</label><input id="date" type="date"></div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="active" data-source="paste">Paste list</button>
+      <button type="button" data-source="csv">Upload CSV</button>
+    </div>
+    <div id="source-paste">
+      <textarea id="pasted" spellcheck="false">Alice Johnson, alice@example.com
+Bob Smith, bob@example.com
+José Müller, jose@example.com
+Priya Sharma, priya@example.com
+Bad Email, not-an-email</textarea>
+      <p class="hint">One recipient per line: <code>Name, email</code></p>
+    </div>
+    <div id="source-csv" hidden>
+      <input id="csv-file" type="file" accept=".csv,text/csv">
+      <p class="hint">CSV with <code>name</code> and <code>email</code> columns (max 2&nbsp;MB).</p>
+    </div>
+
+    <div class="row"><button id="submit-btn">Generate certificates</button></div>
+    <div class="error" id="form-error" hidden></div>
+  </form>
+
+  <section class="card" id="job-card" hidden>
+    <div class="row" style="justify-content: space-between; margin-top: 0">
+      <h2 id="job-title" style="margin: 0"></h2>
+      <span class="pill" id="job-status"></span>
+    </div>
+    <div class="hint" id="job-meta"></div>
+    <div class="bar"><div id="job-bar"></div></div>
+    <div class="stats" id="job-stats"></div>
+    <div class="error" id="job-error" hidden></div>
+    <div class="row">
+      <a id="zip-link" class="button secondary">Download all (ZIP)</a>
+      <button type="button" class="secondary" id="retry-btn" hidden>Retry failed</button>
+    </div>
+
+    <div class="tabs" id="filters">
+      <button type="button" class="active" data-status="">All</button>
+      <button type="button" data-status="generated">Generated</button>
+      <button type="button" data-status="failed">Failed</button>
+      <button type="button" data-status="invalid">Invalid</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Status</th><th>Certificate / error</th></tr></thead>
+        <tbody id="cert-rows"></tbody>
+      </table>
+    </div>
+    <p class="hint" id="cert-more" hidden></p>
+  </section>
+
+  <section class="card">
+    <h2>Verify a certificate</h2>
+    <form class="row" id="verify-form" style="margin-top: 0">
+      <input id="verify-code" placeholder="Certificate ID printed on the PDF" style="flex: 1; min-width: 200px" required>
+      <button class="secondary">Verify</button>
+    </form>
+    <p id="verify-result" class="hint" hidden></p>
+  </section>
+
+  <section class="card">
+    <h2>Recent jobs</h2>
+    <ul class="jobs" id="recent-jobs"></ul>
+    <p class="hint" id="no-jobs" hidden>No jobs yet.</p>
+  </section>
+</main>
+
+<script>
+const API = "/api/v1";
+const PAGE_SIZE = 200;
+const $ = (id) => document.getElementById(id);
+
+let source = "paste";
+let currentJobId = null;
+let statusFilter = "";
+let pollTimer = null;
+
+// Small helper to build elements. Always uses textContent so names/emails
+// typed by users can never inject HTML.
+function el(tag, props = {}, children = []) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+async function request(path, options) {
+  const res = await fetch(API + path, options);
+  const body = res.headers.get("content-type")?.includes("json") ? await res.json() : null;
+  if (!res.ok) throw new Error(describeError(body) || `Request failed (${res.status})`);
+  return body;
+}
+
+// FastAPI returns errors in a few shapes: a string, a list of field errors,
+// or our own {message, invalid_recipients} object.
+function describeError(body) {
+  const detail = body?.detail;
+  if (!detail) return null;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => (typeof d === "string" ? d : `${d.loc.slice(1).join(".")}: ${d.msg}`)).join("\n");
+  }
+  const rows = (detail.invalid_recipients || []).map((r) => `Row ${r.index + 1}: ${r.errors.join("; ")}`);
+  return [detail.message, ...rows].join("\n");
+}
+
+function parsePasted(text) {
+  return text.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+    const i = line.lastIndexOf(",");
+    return i === -1 ? { name: line, email: "" } : { name: line.slice(0, i).trim(), email: line.slice(i + 1).trim() };
+  });
+}
+
+// --- creating a job ---------------------------------------------------------
+
+document.querySelectorAll("[data-source]").forEach((btn) => btn.addEventListener("click", () => {
+  source = btn.dataset.source;
+  document.querySelectorAll("[data-source]").forEach((b) => b.classList.toggle("active", b === btn));
+  $("source-paste").hidden = source !== "paste";
+  $("source-csv").hidden = source !== "csv";
+}));
+
+$("job-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("form-error").hidden = true;
+  $("submit-btn").disabled = true;
+
+  const course_name = $("course").value;
+  const issuer = $("issuer").value;
+  const issue_date = $("date").value || null;
+
+  try {
+    let created;
+    if (source === "paste") {
+      created = await request("/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ course_name, issuer, issue_date, recipients: parsePasted($("pasted").value) }),
+      });
+    } else {
+      const file = $("csv-file").files[0];
+      if (!file) throw new Error("Choose a CSV file first.");
+      const form = new FormData();
+      form.append("file", file);
+      form.append("course_name", course_name);
+      form.append("issuer", issuer);
+      if (issue_date) form.append("issue_date", issue_date);
+      created = await request("/jobs/csv", { method: "POST", body: form });
+    }
+    openJob(created.job_id);
+    loadRecentJobs();
+  } catch (err) {
+    $("form-error").textContent = err.message;
+    $("form-error").hidden = false;
+  } finally {
+    $("submit-btn").disabled = false;
+  }
+});
+
+// --- showing a job ----------------------------------------------------------
+
+function openJob(jobId) {
+  currentJobId = jobId;
+  history.replaceState(null, "", `#job=${jobId}`); // so the page can be refreshed or shared
+  statusFilter = "";
+  document.querySelectorAll("[data-status]").forEach((b) => b.classList.toggle("active", b.dataset.status === ""));
+  $("job-card").hidden = false;
+  $("job-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  refreshJob();
+}
+
+async function refreshJob() {
+  clearTimeout(pollTimer);
+  const jobId = currentJobId;
+  const job = await request(`/jobs/${jobId}`);
+  if (jobId !== currentJobId) return; // user switched to another job meanwhile
+
+  const p = job.progress;
+  $("job-title").textContent = job.course_name;
+  $("job-status").textContent = job.status.replaceAll("_", " ");
+  $("job-status").className = `pill ${job.status}`;
+  $("job-meta").textContent = `Issued by ${job.issuer} on ${job.issue_date} · job ${job.id}`;
+  $("job-bar").style.width = `${p.percent_complete}%`;
+  $("job-stats").replaceChildren(
+    el("span", { textContent: `${p.percent_complete}% done` }),
+    el("span", { textContent: `${p.generated} generated` }),
+    el("span", { textContent: `${p.failed} failed` }),
+    el("span", { textContent: `${p.invalid} invalid` }),
+    el("span", { textContent: `${p.pending} pending` }),
+  );
+  $("job-error").textContent = job.error || "";
+  $("job-error").hidden = !job.error;
+
+  const running = job.status === "pending" || job.status === "processing";
+  $("zip-link").hidden = p.generated === 0;
+  $("zip-link").href = `${API}/jobs/${job.id}/certificates/archive`;
+  $("retry-btn").hidden = running || p.failed === 0;
+
+  await loadCertificates();
+  if (running) pollTimer = setTimeout(refreshJob, 1000);
+  else loadRecentJobs();
+}
+
+async function loadCertificates() {
+  const query = new URLSearchParams({ limit: PAGE_SIZE });
+  if (statusFilter) query.set("status", statusFilter);
+  const page = await request(`/jobs/${currentJobId}/certificates?${query}`);
+
+  $("cert-rows").replaceChildren(...page.items.map((c) => {
+    const detail = c.download_url
+      ? el("a", { href: c.download_url, textContent: "Download PDF", target: "_blank" })
+      : (c.error || "—");
+    return el("tr", {}, [
+      el("td", { textContent: c.row_index + 1 }),
+      el("td", { className: "nowrap", textContent: c.recipient_name || "—" }),
+      el("td", { textContent: c.recipient_email || "—" }),
+      el("td", {}, [el("span", { className: `pill ${c.status}`, textContent: c.status })]),
+      el("td", { className: "detail" }, [detail]),
+    ]);
+  }));
+  $("cert-more").hidden = page.total <= page.items.length;
+  $("cert-more").textContent = `Showing first ${page.items.length} of ${page.total}. Use the API for the rest.`;
+}
+
+document.querySelectorAll("[data-status]").forEach((btn) => btn.addEventListener("click", () => {
+  statusFilter = btn.dataset.status;
+  document.querySelectorAll("[data-status]").forEach((b) => b.classList.toggle("active", b === btn));
+  loadCertificates();
+}));
+
+$("retry-btn").addEventListener("click", async () => {
+  $("retry-btn").disabled = true;
+  try {
+    await request(`/jobs/${currentJobId}/retry`, { method: "POST" });
+    refreshJob();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    $("retry-btn").disabled = false;
+  }
+});
+
+// --- recent jobs & verification --------------------------------------------
+
+async function loadRecentJobs() {
+  const jobs = await request("/jobs?limit=10");
+  $("no-jobs").hidden = jobs.length > 0;
+  $("recent-jobs").replaceChildren(...jobs.map((job) => {
+    const li = el("li", {}, [
+      el("span", { textContent: `${job.course_name} · ${job.progress.total} recipients` }),
+      el("span", { className: `pill ${job.status}`, textContent: job.status.replaceAll("_", " ") }),
+    ]);
+    li.addEventListener("click", () => openJob(job.id));
+    return li;
+  }));
+}
+
+$("verify-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = $("verify-result");
+  out.hidden = false;
+  try {
+    const code = encodeURIComponent($("verify-code").value.trim());
+    const r = await request(`/verify/${code}`);
+    out.style.color = "var(--ok)";
+    out.textContent = `✓ Valid: ${r.recipient_name} completed "${r.course_name}", issued by ${r.issuer} on ${r.issue_date}.`;
+  } catch (err) {
+    out.style.color = "var(--err)";
+    out.textContent = `✗ ${err.message}`;
+  }
+});
+
+$("date").valueAsDate = new Date();
+loadRecentJobs();
+const linkedJob = location.hash.match(/^#job=([\w-]+)$/);
+if (linkedJob) openJob(linkedJob[1]);
+</script>
+</body>
+</html>
