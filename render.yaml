@@ -1,0 +1,13 @@
+# Render blueprint: New + > Blueprint > pick this repo.
+# Free plan has no persistent disk, so the DB and PDFs reset on every redeploy/restart.
+services:
+  - type: web
+    name: certificate-generator
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MAX_RECIPIENTS_PER_JOB
+        value: "1000"
+      - key: WORKER_THREADS
+        value: "2"
