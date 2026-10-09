@@ -1,0 +1,13 @@
+{
+  "course_name": "Backend Development with FastAPI",
+  "issuer": "Acme Academy",
+  "issue_date": "2026-10-01",
+  "recipients": [
+    { "name": "Alice Johnson", "email": "alice@example.com" },
+    { "name": "Bob Smith", "email": "bob@example.com" },
+    { "name": "José Müller", "email": "jose@example.com" },
+    { "name": "", "email": "missing-name@example.com" },
+    { "name": "Bad Email", "email": "not-an-email" },
+    { "name": "Alice Duplicate", "email": "ALICE@example.com" }
+  ]
+}

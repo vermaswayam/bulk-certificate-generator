@@ -1,0 +1,7 @@
+name,email
+Alice Johnson,alice@example.com
+Bob Smith,bob@example.com
+José Müller,jose@example.com
+Priya Sharma,priya@example.com
+,missing-name@example.com
+Bad Email,not-an-email
